@@ -1,0 +1,7 @@
+# Claude Code 로컬 전용 설정 (머신별 권한 캐시, 공유 불필요)
+.claude/settings.local.json
+
+# .NET 빌드 산출물 (Phase 1 코딩 시작 후 대비)
+bin/
+obj/
+*.user
