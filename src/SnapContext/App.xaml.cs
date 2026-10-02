@@ -1,22 +1,27 @@
 using System;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Threading;
+using Bitmap = System.Drawing.Bitmap;
 
 namespace SnapContext;
 
 /// <summary>
-/// Week 1 PoC: 전역 핫키(Ctrl+Alt+S) → 영역 선택 → GDI BitBlt 캡처 → 클립보드 즉시 반영.
-/// 규칙 A-1: 캡처 트리거 후 클립보드 반영까지 어떤 필수 입력도 끼어들지 않는다
-/// (영역 드래그 선택 자체는 캡처 동작 그 자체이지, "선택적 설명 입력" 단계가 아님).
+/// 전역 핫키(Ctrl+Alt+S) → 영역 선택 → GDI BitBlt 캡처 → 클립보드 즉시 반영 → 비모달 설명 토스트.
+/// 규칙 A-1: 클립보드 반영까지 어떤 필수 입력도 끼어들지 않는다(영역 드래그 선택은 캡처 동작 그 자체).
+/// 설명은 선택사항이며, 입력하면 캡션으로 번인한 이미지로 클립보드를 갱신한다.
 /// </summary>
 public partial class App : Application
 {
     private const uint VkS = 0x53;
+    private static readonly string[] DefaultTags = { "버그", "UI 검토", "에러 로그" };
+
+    private readonly RecentDescriptionStore _recents = new();
 
     private HotkeyManager? _hotkeyManager;
     private Window? _messageWindow;
+    private CaptureToastWindow? _toast;
+    private bool _captureInProgress;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -37,16 +42,20 @@ public partial class App : Application
         };
 
         _hotkeyManager = new HotkeyManager(_messageWindow);
-        _hotkeyManager.HotkeyPressed += OnCaptureHotkeyPressed;
 
-        bool registered = _hotkeyManager.TryRegister(ModifierKeys.Control | ModifierKeys.Alt, VkS);
-        if (!registered)
+        // WM_HOTKEY 처리 안에서 모달 오버레이를 열지 않도록 디스패처로 넘긴다.
+        int id = _hotkeyManager.TryRegister(
+            ModifierKeys.Control | ModifierKeys.Alt,
+            VkS,
+            () => Dispatcher.BeginInvoke(new Action(OnCaptureHotkeyPressed)));
+
+        if (id == 0)
         {
             // 규칙 8-1/C-12: 등록 실패는 사용자에게 명확히 안내한다.
-            // 재설정 UI/대체 키 자동 제안은 이후 단계(Week 2+) 구현 예정 - 지금은 PoC 단계.
+            // 재설정 UI/대체 키 자동 제안은 이후 단계 구현 예정.
             MessageBox.Show(
                 "기본 단축키(Ctrl+Alt+S) 등록에 실패했습니다. 다른 프로그램과 충돌 중일 수 있습니다.\n" +
-                "(정식 재설정 UI는 이후 단계에서 구현 예정 — 현재는 Week 1 PoC)",
+                "(정식 재설정 UI는 이후 단계에서 구현 예정)",
                 "SnapContext - 핫키 등록 실패",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
@@ -55,64 +64,90 @@ public partial class App : Application
 
     private void OnCaptureHotkeyPressed()
     {
-        var overlay = new RegionSelectionWindow();
-        var result = overlay.ShowDialog();
-
-        if (result != true || overlay.SelectedRegion is not { Width: > 0, Height: > 0 } region)
+        if (_captureInProgress)
         {
-            return; // Esc 취소 또는 너무 작은 선택
+            return;
         }
 
-        using var bitmap = ScreenCapture.CaptureRegion(region);
-        var bitmapSource = ScreenCapture.ToBitmapSource(bitmap);
+        _captureInProgress = true;
+        try
+        {
+            CloseToast();
 
-        // 규칙 A-1: 다른 입력을 기다리지 않고 즉시 클립보드 반영
-        Clipboard.SetImage(bitmapSource);
+            var overlay = new RegionSelectionWindow();
+            var result = overlay.ShowDialog();
 
-        ShowCaptureToast();
+            if (result != true || overlay.SelectedRegion is not { Width: > 0, Height: > 0 } region)
+            {
+                return; // Esc 취소 또는 너무 작은 선택
+            }
+
+            var bitmap = ScreenCapture.CaptureRegion(region);
+
+            // 규칙 A-1: 다른 입력을 기다리지 않고 즉시 클립보드 반영
+            bool copied = ClipboardHelper.TrySetImage(ScreenCapture.ToBitmapSource(bitmap));
+
+            ShowToast(bitmap, copied);
+        }
+        finally
+        {
+            _captureInProgress = false;
+        }
     }
 
-    /// <summary>
-    /// 규칙 A-2/A-3의 축소판 미리보기: 포커스를 뺏지 않고(ShowActivated=false),
-    /// 사용자 행동 없이도 자동으로 소멸하는 알림. 설명 입력 UI는 Week 2에서 구현.
-    /// </summary>
-    private void ShowCaptureToast()
+    private void ShowToast(Bitmap original, bool copied)
     {
-        var toast = new Window
+        var toast = new CaptureToastWindow(
+            _hotkeyManager!,
+            copied ? _recents.Load() : Array.Empty<string>(),
+            DefaultTags,
+            copied,
+            description => ApplyDescription(original, description));
+
+        // 원본 비트맵은 토스트가 사라질 때까지(설명 반영 가능 시간 동안) 보관한다.
+        toast.Closed += (_, _) =>
         {
-            Width = 340,
-            Height = 56,
-            WindowStyle = WindowStyle.None,
-            AllowsTransparency = true,
-            Background = new SolidColorBrush(Color.FromArgb(230, 30, 30, 30)),
-            Topmost = true,
-            ShowInTaskbar = false,
-            ShowActivated = false,
-            Content = new System.Windows.Controls.TextBlock
+            if (ReferenceEquals(_toast, toast))
             {
-                Text = "✓ 캡처 완료 — 클립보드에 복사됨 (바로 Ctrl+V 가능)",
-                Foreground = Brushes.White,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(14, 0, 14, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-            },
+                _toast = null;
+            }
+            original.Dispose();
         };
 
-        toast.Left = SystemParameters.WorkArea.Right - toast.Width - 20;
-        toast.Top = SystemParameters.WorkArea.Bottom - toast.Height - 20;
+        _toast = toast;
         toast.Show();
+    }
 
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
-        timer.Tick += (_, _) =>
+    private bool ApplyDescription(Bitmap original, string description)
+    {
+        try
         {
-            timer.Stop();
-            toast.Close();
-        };
-        timer.Start();
+            using var composed = CaptionRenderer.Compose(original, description);
+            if (!ClipboardHelper.TrySetImage(ScreenCapture.ToBitmapSource(composed)))
+            {
+                return false;
+            }
+
+            _recents.Add(description);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"캡션 반영 실패: {ex}");
+            return false;
+        }
+    }
+
+    private void CloseToast()
+    {
+        var toast = _toast;
+        _toast = null;
+        toast?.Close();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        CloseToast();
         _hotkeyManager?.Dispose();
         base.OnExit(e);
     }

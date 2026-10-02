@@ -1,0 +1,114 @@
+<Window x:Class="SnapContext.CaptureToastWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="396"
+        SizeToContent="Height"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        FontFamily="Segoe UI, Malgun Gothic"
+        SourceInitialized="Window_SourceInitialized"
+        SizeChanged="Window_SizeChanged"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Deactivated="Window_Deactivated"
+        MouseLeave="Window_MouseLeave">
+    <Window.Resources>
+        <Style x:Key="ChipButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#EDEDED" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="#3A3D41" CornerRadius="12" Padding="10,4">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#4F8EF7" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GhostButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#9AA0A6" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent" Padding="6,0">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="8" Background="#F2202124" CornerRadius="10" Padding="14,12">
+        <StackPanel>
+            <Grid>
+                <TextBlock x:Name="HeaderText"
+                           Foreground="White"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           Margin="0,0,24,0" />
+                <Button x:Name="CloseButton"
+                        Content="✕"
+                        Style="{StaticResource GhostButton}"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        ToolTip="닫기"
+                        Click="CloseButton_Click" />
+            </Grid>
+
+            <StackPanel x:Name="ContentPanel">
+                <WrapPanel x:Name="TagPanel" Margin="0,10,0,0" />
+                <WrapPanel x:Name="RecentPanel" />
+                <Grid Margin="0,2,0,0">
+                    <TextBox x:Name="InputBox"
+                             MaxLength="200"
+                             Background="#2B2D31"
+                             Foreground="White"
+                             CaretBrush="White"
+                             BorderBrush="#4A4E54"
+                             Padding="8,6"
+                             FontSize="13"
+                             VerticalContentAlignment="Center"
+                             PreviewMouseLeftButtonDown="InputBox_PreviewMouseLeftButtonDown"
+                             TextChanged="InputBox_TextChanged"
+                             KeyDown="InputBox_KeyDown" />
+                    <TextBlock x:Name="Placeholder"
+                               Text="설명 입력 (선택)"
+                               Foreground="#80868B"
+                               FontSize="13"
+                               IsHitTestVisible="False"
+                               VerticalAlignment="Center"
+                               Margin="10,0,0,0" />
+                </Grid>
+                <TextBlock x:Name="HintText"
+                           Margin="0,6,0,0"
+                           Foreground="#9AA0A6"
+                           FontSize="11"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
