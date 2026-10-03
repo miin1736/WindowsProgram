@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -19,6 +21,11 @@ namespace SnapContext;
 /// 단축키: 맨 숫자키·Esc를 전역으로 가로채면 다른 앱에 입력하는 키를 삼키므로,
 /// 최근 설명 재사용은 표시되는 동안에만 등록되는 Ctrl+Alt+1~5를 쓴다. Esc는 토스트가 활성화된 상태에서만 동작한다.
 /// 자동 소멸(규칙 A-3): 마우스를 올려두거나 입력 중이면 카운트다운을 멈춘다.
+///
+/// 설명 보강 버전(EnhanceMode):
+/// - Template(C): 태그를 누르면 완성된 질문 문장이 설명이 된다.
+/// - TextRewrite(A) / ImageDescribe(B): 입력한 설명은 먼저 그대로 반영(즉시 사용 가능)하고,
+///   AI 제안은 뒤따라 도착하면 "제안"으로만 보여준다. 사용자가 "이 문장으로 교체"를 눌러야 클립보드가 바뀐다.
 /// </summary>
 public partial class CaptureToastWindow : Window
 {
@@ -38,30 +45,49 @@ public partial class CaptureToastWindow : Window
     private const int TickMs = 100;
     private const int AppliedMs = 1200;
     private const int FailedMs = 3000;
+    private const int SuggestionDecisionMs = 10000;
     private const double ScreenMargin = 8;
 
     private readonly Func<string, bool> _applyDescription;
+    private readonly Func<string?, CancellationToken, Task<AiResult>>? _requestSuggestion;
+    private readonly EnhanceMode _mode;
     private readonly List<int> _hotkeyIds = new();
     private readonly HotkeyManager _hotkeys;
+    private readonly CancellationTokenSource _cts = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(TickMs) };
 
     private int _remainingMs = DisplayMs;
     private bool _noActivate = true;
     private bool _finished;
-    private bool _resultShown;
+    private bool _closingPhase;
+    private bool _holdCountdown;
+    private bool _closed;
+    private bool _appliedVerbatim;
+    private string? _suggestion;
 
     /// <param name="applyDescription">설명을 이미지에 반영하고 클립보드를 갱신한다. 성공 여부를 반환한다.</param>
+    /// <param name="requestSuggestion">A/B 버전에서 AI 제안을 받아 오는 함수(메모 → 제안). 다른 버전에서는 null.</param>
     public CaptureToastWindow(
         HotkeyManager hotkeys,
         IReadOnlyList<string> recents,
         IReadOnlyList<string> tags,
         bool copied,
-        Func<string, bool> applyDescription)
+        Func<string, bool> applyDescription,
+        EnhanceMode mode = EnhanceMode.Plain,
+        Func<string?, CancellationToken, Task<AiResult>>? requestSuggestion = null)
     {
         InitializeComponent();
 
         _hotkeys = hotkeys;
         _applyDescription = applyDescription;
+        _mode = mode;
+        _requestSuggestion = EnhanceModes.UsesAi(mode) ? requestSuggestion : null;
+
+        if (mode != EnhanceMode.Plain)
+        {
+            ModeBadge.Text = EnhanceModes.Label(mode);
+            ModeBadge.Visibility = Visibility.Visible;
+        }
 
         if (!copied)
         {
@@ -83,6 +109,14 @@ public partial class CaptureToastWindow : Window
 
     private void BuildChips(IReadOnlyList<string> recents, IReadOnlyList<string> tags)
     {
+        if (_mode == EnhanceMode.ImageDescribe && _requestSuggestion is not null)
+        {
+            TagPanel.Children.Add(CreateChip(
+                new TextBlock { Text = "✨ AI가 설명 작성" },
+                () => Finish(InputBox.Text, forceAi: true),
+                "스크린샷을 AI(Anthropic)로 보내 설명을 작성합니다"));
+        }
+
         foreach (var tag in tags)
         {
             var captured = tag;
@@ -118,9 +152,22 @@ public partial class CaptureToastWindow : Window
             }
         }
 
-        HintText.Text = count > 0
+        HintText.Text = BuildHint(count);
+    }
+
+    private string BuildHint(int recentCount)
+    {
+        string basics = recentCount > 0
             ? "Ctrl+Alt+1~5: 최근 설명 적용 · 입력창을 클릭하면 직접 입력 (Enter 적용, Esc 닫기)"
             : "입력창을 클릭하면 직접 입력할 수 있습니다 (Enter 적용, Esc 닫기)";
+
+        return _mode switch
+        {
+            EnhanceMode.Template => "태그를 누르면 완성된 질문 문장이 이미지에 들어갑니다. " + basics,
+            EnhanceMode.TextRewrite => basics + "\n설명을 적용하면 그 글(이미지 제외)이 AI(Anthropic)로 전송되어 다듬은 제안을 받습니다.",
+            EnhanceMode.ImageDescribe => basics + "\n✨ 버튼이나 설명 적용 시 스크린샷이 AI(Anthropic)로 전송됩니다.",
+            _ => basics,
+        };
     }
 
     private Button CreateChip(object content, Action onClick, string? toolTip)
@@ -137,12 +184,22 @@ public partial class CaptureToastWindow : Window
 
     private void ApplyTag(string tag)
     {
-        var text = InputBox.Text.Trim();
-        Finish(text.Length == 0 ? tag : $"{tag}: {text}");
+        var memo = InputBox.Text.Trim();
+
+        if (_mode == EnhanceMode.Template)
+        {
+            Finish(PromptTemplates.Build(tag, memo) ?? tag);
+            return;
+        }
+
+        Finish(memo.Length == 0 ? tag : $"{tag}: {memo}");
     }
 
-    /// <summary>설명을 반영하고 닫는다. 빈 설명이면 아무것도 바꾸지 않고 닫는다(클립보드의 원본 이미지 유지).</summary>
-    private void Finish(string? description)
+    /// <summary>
+    /// 설명을 반영하고 마무리한다. 빈 설명이면 아무것도 바꾸지 않고 닫는다(클립보드의 원본 이미지 유지).
+    /// A/B 버전에서는 반영 뒤에 AI 제안을 요청한다(forceAi는 메모 없이 AI만 요청하는 B의 ✨ 버튼용).
+    /// </summary>
+    private void Finish(string? description, bool forceAi = false)
     {
         if (_finished)
         {
@@ -153,34 +210,119 @@ public partial class CaptureToastWindow : Window
         UnregisterHotkeys();
 
         description = description?.Trim();
-        if (string.IsNullOrEmpty(description))
+        bool hasText = !string.IsNullOrEmpty(description);
+        bool wantsAi = _requestSuggestion is not null && (hasText || forceAi);
+
+        if (!hasText && !wantsAi)
         {
             _timer.Stop();
             Close();
             return;
         }
 
-        bool applied;
+        if (hasText)
+        {
+            _appliedVerbatim = TryApply(description!);
+            if (!wantsAi || !_appliedVerbatim)
+            {
+                ShowResult(_appliedVerbatim);
+                return;
+            }
+        }
+
+        StartAi(hasText ? description : null);
+    }
+
+    private bool TryApply(string text)
+    {
         try
         {
-            applied = _applyDescription(description);
+            return _applyDescription(text);
         }
         catch (Exception)
         {
-            applied = false;
+            return false;
+        }
+    }
+
+    private void StartAi(string? memo)
+    {
+        _holdCountdown = true;
+        ContentPanel.Visibility = Visibility.Collapsed;
+        AiPanel.Visibility = Visibility.Visible;
+
+        HeaderText.Text = _appliedVerbatim ? "✓ 설명이 이미지에 반영되었습니다" : "✨ AI에게 요청했습니다";
+        AiStatusText.Text = (_mode == EnhanceMode.ImageDescribe ? "✨ AI가 이미지를 분석하는 중…" : "✨ AI가 문장을 다듬는 중…")
+            + (_appliedVerbatim ? " 원문은 이미 반영되어 있어 바로 붙여넣을 수 있습니다." : "");
+
+        _ = RunAiAsync(memo);
+    }
+
+    private async Task RunAiAsync(string? memo)
+    {
+        AiResult result;
+        try
+        {
+            result = await _requestSuggestion!(memo, _cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception)
+        {
+            result = new AiResult(false, "", "AI 제안을 받지 못했습니다.");
         }
 
-        ShowResult(applied);
+        if (_closed)
+        {
+            return;
+        }
+
+        _holdCountdown = false;
+        if (result.Ok && !string.IsNullOrWhiteSpace(result.Text))
+        {
+            ShowSuggestion(result.Text);
+        }
+        else
+        {
+            ShowAiError(result.Error ?? "AI 제안을 받지 못했습니다.");
+        }
+    }
+
+    private void ShowSuggestion(string text)
+    {
+        _suggestion = text;
+        AiStatusText.Text = "✨ AI 제안";
+        SuggestionText.Text = text;
+        SuggestionBorder.Visibility = Visibility.Visible;
+        SuggestionButtons.Visibility = Visibility.Visible;
+        _remainingMs = SuggestionDecisionMs;
+    }
+
+    private void ShowAiError(string message)
+    {
+        AiStatusText.Text = "⚠ " + message + (_appliedVerbatim ? " (입력한 설명은 그대로 반영되어 있습니다)" : "");
+        _closingPhase = true;
+        _remainingMs = FailedMs + 1000;
     }
 
     private void ShowResult(bool applied)
     {
-        _resultShown = true;
+        ShowFinal(
+            applied
+                ? "✓ 설명이 이미지에 반영되었습니다"
+                : "⚠ 설명을 반영하지 못했습니다 (원본 이미지는 클립보드에 그대로 있습니다)",
+            applied ? AppliedMs : FailedMs);
+    }
+
+    private void ShowFinal(string message, int showMs)
+    {
         ContentPanel.Visibility = Visibility.Collapsed;
-        HeaderText.Text = applied
-            ? "✓ 설명이 이미지에 반영되었습니다"
-            : "⚠ 설명을 반영하지 못했습니다 (원본 이미지는 클립보드에 그대로 있습니다)";
-        _remainingMs = applied ? AppliedMs : FailedMs;
+        AiPanel.Visibility = Visibility.Collapsed;
+        HeaderText.Text = message;
+        _closingPhase = true;
+        _remainingMs = showMs;
         if (!_timer.IsEnabled)
         {
             _timer.Start();
@@ -189,7 +331,12 @@ public partial class CaptureToastWindow : Window
 
     private void OnTick(object? sender, EventArgs e)
     {
-        if (!_resultShown && IsInteracting)
+        if (_holdCountdown)
+        {
+            return;
+        }
+
+        if (!_closingPhase && IsInteracting)
         {
             return;
         }
@@ -213,9 +360,11 @@ public partial class CaptureToastWindow : Window
 
     private void Cleanup()
     {
+        _closed = true;
         _finished = true;
         _timer.Stop();
         UnregisterHotkeys();
+        _cts.Cancel();
     }
 
     private void SetNoActivate(bool enabled)
@@ -240,7 +389,7 @@ public partial class CaptureToastWindow : Window
     {
         if (e.Key == Key.Escape)
         {
-            Finish(null);
+            DismissOrClose();
             e.Handled = true;
         }
     }
@@ -256,7 +405,44 @@ public partial class CaptureToastWindow : Window
         _remainingMs = Math.Max(_remainingMs, GraceMs);
     }
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => Finish(null);
+    private void CloseButton_Click(object sender, RoutedEventArgs e) => DismissOrClose();
+
+    /// <summary>입력 단계면 설명 없이 닫고, 이미 반영/AI 단계면 AI 요청을 취소하고 즉시 닫는다.</summary>
+    private void DismissOrClose()
+    {
+        if (_finished)
+        {
+            _timer.Stop();
+            Close();
+        }
+        else
+        {
+            Finish(null);
+        }
+    }
+
+    private void AcceptButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_suggestion is null || _closingPhase)
+        {
+            return;
+        }
+
+        var text = _suggestion;
+        _suggestion = null;
+        bool ok = TryApply(text);
+        ShowFinal(
+            ok
+                ? "✓ AI 제안이 이미지에 반영되었습니다"
+                : "⚠ AI 제안을 반영하지 못했습니다 (클립보드의 이미지는 그대로 있습니다)",
+            ok ? AppliedMs : FailedMs);
+    }
+
+    private void KeepButton_Click(object sender, RoutedEventArgs e)
+    {
+        _timer.Stop();
+        Close();
+    }
 
     private void InputBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
