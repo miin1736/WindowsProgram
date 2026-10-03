@@ -1,0 +1,205 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1300" viewBox="0 0 1700 1300" font-family="'Segoe UI','Malgun Gothic','Apple SD Gothic Neo',sans-serif">
+<defs>
+<marker id="head-2563EB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563EB"/></marker>
+<marker id="head-16A34A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16A34A"/></marker>
+<marker id="head-D97706" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#D97706"/></marker>
+<marker id="head-DC2626" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#DC2626"/></marker>
+<marker id="head-6B7280" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6B7280"/></marker>
+<marker id="head-475569" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+</defs>
+<rect width="1700" height="1300" fill="#F8F9FB"/>
+<text x="50" y="58" font-size="28" font-weight="700" fill="#111827" text-anchor="start">SnapContext 구성도 — 한 번의 캡처가 지나가는 길</text>
+<text x="50" y="88" font-size="14.5" font-weight="400" fill="#6B7280" text-anchor="start">개발자 참고용 · C# / .NET 8 / WPF (src/SnapContext) · 2026-10-03 기준 (Week 2.5: 설명 보강 3개 버전)</text>
+<rect x="40" y="118" width="1620" height="232" rx="14" fill="#EAF2FF" stroke="#A9C8FF" stroke-width="1.5"/>
+<text x="70" y="144" font-size="14.5" font-weight="700" fill="#2563EB" text-anchor="start">① 캡처 파이프라인 — 항상 동작하며 사용자 입력이 필요 없음 (규칙 A-1)</text>
+<rect x="70" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
+<text x="84" y="194" font-size="14" font-weight="700" fill="#111827" text-anchor="start">HotkeyManager.cs</text>
+<text x="84" y="216" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">RegisterHotKey / WM_HOTKEY</text>
+<text x="84" y="235" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">숨김 메시지 창에서 수신</text>
+<text x="84" y="254" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">여러 핫키를 동시에 등록·해제</text>
+<text x="84" y="273" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">충돌로 실패하면 0 반환 (C-12)</text>
+<rect x="390" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
+<text x="404" y="194" font-size="14" font-weight="700" fill="#111827" text-anchor="start">App.xaml.cs  (지휘자)</text>
+<text x="404" y="216" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">전체 흐름 연결, 재진입 방지</text>
+<text x="404" y="235" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">--mode 읽기, AI 클라이언트 준비</text>
+<text x="404" y="254" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">원본 비트맵을 토스트가 닫힐 때까지 보관</text>
+<text x="404" y="273" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">설명 반영(ApplyDescription) 담당</text>
+<rect x="710" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
+<text x="724" y="194" font-size="14" font-weight="700" fill="#111827" text-anchor="start">RegionSelectionWindow</text>
+<text x="724" y="216" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">가상 화면 전체를 덮는 오버레이</text>
+<text x="724" y="235" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">드래그로 영역 선택, Esc로 취소</text>
+<text x="724" y="254" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">DIP → 물리 픽셀 좌표 변환</text>
+<text x="724" y="273" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">(WPF, Topmost)</text>
+<rect x="1030" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
+<text x="1044" y="194" font-size="14" font-weight="700" fill="#111827" text-anchor="start">ScreenCapture.cs</text>
+<text x="1044" y="216" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">GDI CopyFromScreen (C-14)</text>
+<text x="1044" y="235" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">권한 창 없이 즉시 캡처</text>
+<text x="1044" y="254" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">Bitmap → BitmapSource 변환</text>
+<text x="1044" y="273" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">보호된 창은 검은 화면 (8-3)</text>
+<rect x="1350" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
+<text x="1364" y="194" font-size="14" font-weight="700" fill="#111827" text-anchor="start">ClipboardHelper.cs</text>
+<text x="1364" y="216" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">모든 클립보드 쓰기의 단일 경로</text>
+<text x="1364" y="235" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">Win+V·클라우드 제외 플래그 (B-10)</text>
+<text x="1364" y="254" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">다른 프로그램이 잡고 있으면 6회 재시도</text>
+<text x="1364" y="273" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">실패 시 토스트에 경고 표시</text>
+<polyline points="350,245 390,245" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-2563EB)"/>
+<circle cx="370" cy="245" r="12" fill="#2563EB" stroke="#FFFFFF" stroke-width="2"/>
+<text x="370" y="249.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+<polyline points="670,245 710,245" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-2563EB)"/>
+<circle cx="690" cy="245" r="12" fill="#2563EB" stroke="#FFFFFF" stroke-width="2"/>
+<text x="690" y="249.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+<polyline points="990,245 1030,245" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-2563EB)"/>
+<circle cx="1010" cy="245" r="12" fill="#2563EB" stroke="#FFFFFF" stroke-width="2"/>
+<text x="1010" y="249.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+<polyline points="1310,245 1350,245" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-2563EB)"/>
+<circle cx="1330" cy="245" r="12" fill="#2563EB" stroke="#FFFFFF" stroke-width="2"/>
+<text x="1330" y="249.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+<rect x="40" y="380" width="1620" height="318" rx="14" fill="#EAF7EE" stroke="#A7DDB5" stroke-width="1.5"/>
+<text x="700" y="406" font-size="14.5" font-weight="700" fill="#16A34A" text-anchor="start">② 설명 단계 — 선택 사항이며, 하지 않아도 이미 붙여넣을 수 있음 (규칙 A-1 · A-2 · A-3)</text>
+<rect x="70" y="424" width="560" height="248" rx="10" fill="#FFFFFF" stroke="#16A34A" stroke-width="1.6"/>
+<text x="84" y="448" font-size="14" font-weight="700" fill="#111827" text-anchor="start">CaptureToastWindow  (비모달 토스트, 우하단)</text>
+<text x="84" y="470" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">WS_EX_NOACTIVATE: 다른 앱의 포커스를 뺏지 않음 (A-2)</text>
+<text x="84" y="489" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">약 4초 뒤 자동 소멸. 마우스를 올려두거나 입력 중,</text>
+<text x="84" y="508" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">AI 응답을 기다리는 동안은 카운트다운 정지 (A-3)</text>
+<text x="84" y="527" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">태그 칩 · 최근 설명 칩 · 직접 입력(Enter)</text>
+<text x="84" y="546" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">표시 중에만 Ctrl+Alt+1~5 임시 핫키 등록</text>
+<text x="84" y="565" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">Esc는 활성화된 상태에서만 / ✕·자동 소멸로도 닫힘</text>
+<text x="84" y="584" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">A·B: 제안 패널 [이 문장으로 교체] [원문 유지]</text>
+<rect x="700" y="424" width="280" height="108" rx="10" fill="#FFFFFF" stroke="#16A34A" stroke-width="1.6"/>
+<text x="714" y="448" font-size="14" font-weight="700" fill="#111827" text-anchor="start">App.ApplyDescription</text>
+<text x="714" y="470" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">입력한 글을 먼저 그대로 반영</text>
+<text x="714" y="489" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">캡션 합성 후 클립보드 교체</text>
+<text x="714" y="508" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">성공하면 최근 설명에 저장</text>
+<rect x="1020" y="424" width="280" height="108" rx="10" fill="#FFFFFF" stroke="#16A34A" stroke-width="1.6"/>
+<text x="1034" y="448" font-size="14" font-weight="700" fill="#111827" text-anchor="start">CaptionRenderer.cs</text>
+<text x="1034" y="470" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">이미지 아래에 설명 띠를 번인</text>
+<text x="1034" y="489" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">글자 크기는 이미지 폭에 비례</text>
+<text x="1034" y="508" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">클립보드에는 이미지 1장만</text>
+<rect x="700" y="564" width="280" height="108" rx="10" fill="#FFFFFF" stroke="#16A34A" stroke-width="1.6"/>
+<text x="714" y="588" font-size="14" font-weight="700" fill="#111827" text-anchor="start">RecentDescriptionStore</text>
+<text x="714" y="610" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">최근 설명 5개 (JSON)</text>
+<text x="714" y="629" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">%APPDATA%\SnapContext\</text>
+<text x="714" y="648" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">recent_descriptions.json</text>
+<rect x="1350" y="424" width="280" height="108" rx="10" fill="#FFFFFF" stroke="#475569" stroke-width="1.6"/>
+<text x="1364" y="448" font-size="14" font-weight="700" fill="#111827" text-anchor="start">Windows 클립보드</text>
+<text x="1364" y="470" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">이미지 (CF_BITMAP / DIB / DIBV5)</text>
+<text x="1364" y="489" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">+ 히스토리·클라우드 제외 플래그 2개</text>
+<text x="1364" y="508" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">이 시점부터 Ctrl+V 가능</text>
+<rect x="1350" y="564" width="280" height="108" rx="10" fill="#FFFFFF" stroke="#475569" stroke-width="1.6"/>
+<text x="1364" y="588" font-size="14" font-weight="700" fill="#111827" text-anchor="start">붙여넣기 대상</text>
+<text x="1364" y="610" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">ChatGPT · Claude · Gemini</text>
+<text x="1364" y="629" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">Ctrl+V → 이미지 1장 (캡션 포함)</text>
+<text x="1364" y="648" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">세 사이트 모두 동작 확인</text>
+<polyline points="530,320 530,424" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-16A34A)"/>
+<circle cx="530" cy="392" r="12" fill="#16A34A" stroke="#FFFFFF" stroke-width="2"/>
+<text x="530" y="396.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+<text x="548" y="396" font-size="12" font-weight="400" fill="#16A34A" text-anchor="start">토스트 표시</text>
+<polyline points="1490,320 1490,424" fill="none" stroke="#2563EB" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-2563EB)"/>
+<circle cx="1490" cy="392" r="12" fill="#2563EB" stroke="#FFFFFF" stroke-width="2"/>
+<text x="1490" y="396.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+<text x="1508" y="396" font-size="12" font-weight="400" fill="#2563EB" text-anchor="start">원본 이미지를 즉시</text>
+<polyline points="630,470 700,470" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-16A34A)"/>
+<circle cx="665" cy="452" r="12" fill="#16A34A" stroke="#FFFFFF" stroke-width="2"/>
+<text x="665" y="456.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text>
+<polyline points="980,478 1020,478" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-16A34A)"/>
+<polyline points="1300,478 1350,478" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-16A34A)"/>
+<text x="1306" y="466" font-size="12" font-weight="400" fill="#16A34A" text-anchor="start">교체</text>
+<polyline points="840,532 840,564" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-16A34A)"/>
+<text x="850" y="552" font-size="11.5" font-weight="400" fill="#16A34A" text-anchor="start">Add</text>
+<polyline points="700,618 630,618" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-16A34A)"/>
+<text x="640" y="608" font-size="11.5" font-weight="400" fill="#16A34A" text-anchor="start">Load</text>
+<polyline points="1490,532 1490,564" fill="none" stroke="#475569" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-475569)"/>
+<circle cx="1470" cy="548" r="12" fill="#475569" stroke="#FFFFFF" stroke-width="2"/>
+<text x="1470" y="552.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">9</text>
+<rect x="40" y="728" width="1620" height="352" rx="14" fill="#FFF6E5" stroke="#F5D08A" stroke-width="1.5"/>
+<text x="480" y="754" font-size="14.5" font-weight="700" fill="#D97706" text-anchor="start">③ 설명 보강 버전 — 실험 기능, --mode 로 선택 (인자가 없으면 AI 꺼짐)</text>
+<rect x="70" y="770" width="1095" height="46" rx="8" fill="#FFFFFF" stroke="#D97706" stroke-width="1.6"/>
+<text x="86" y="790" font-size="14" font-weight="700" fill="#111827" text-anchor="start">EnhanceMode</text>
+<text x="190" y="790" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">scripts\run-version-plain | C | A | B .cmd  →  SnapContext.exe --mode C | A | B</text>
+<text x="86" y="808" font-size="11.5" font-weight="400" fill="#6B7280" text-anchor="start">토스트를 만들 때 모드와 'AI 제안 요청 함수'를 넘겨줌. 모델: claude-opus-5-5 (SNAPCONTEXT_AI_MODEL로 변경 가능)</text>
+<polyline points="350,672 350,770" fill="none" stroke="#D97706" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-D97706)"/>
+<circle cx="350" cy="722" r="12" fill="#D97706" stroke="#FFFFFF" stroke-width="2"/>
+<text x="350" y="726.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+<text x="368" y="726" font-size="12" font-weight="400" fill="#D97706" text-anchor="start">토스트 생성 시 주입</text>
+<rect x="70" y="854" width="255" height="150" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.6"/>
+<text x="84" y="878" font-size="14" font-weight="700" fill="#111827" text-anchor="start">기본 (Plain)</text>
+<text x="84" y="900" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">입력한 글을 그대로 캡션으로</text>
+<text x="84" y="919" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">AI 없음 · 즉시 · 로컬</text>
+<text x="84" y="938" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">밖으로 나가는 데이터 없음</text>
+<rect x="350" y="854" width="255" height="150" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.6"/>
+<text x="364" y="878" font-size="14" font-weight="700" fill="#111827" text-anchor="start">C · PromptTemplates</text>
+<text x="364" y="900" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">태그를 완성된 질문 문장으로</text>
+<text x="364" y="919" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">버그 / UI 검토 / 에러 로그</text>
+<text x="364" y="938" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">메모가 있으면 '상황: …' 덧붙임</text>
+<text x="364" y="957" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">AI 없음 · 즉시 · 로컬</text>
+<rect x="630" y="854" width="255" height="150" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.6"/>
+<text x="644" y="878" font-size="14" font-weight="700" fill="#111827" text-anchor="start">A · RewriteMemoAsync</text>
+<text x="644" y="900" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">메모 글만 전송 (이미지 제외)</text>
+<text x="644" y="919" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">다듬은 1~3문장을 '제안'으로</text>
+<text x="644" y="938" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">처음 쓸 때 'text' 동의 필요</text>
+<text x="644" y="957" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">공식 C# SDK(Anthropic) 사용</text>
+<rect x="910" y="854" width="255" height="150" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.6"/>
+<text x="924" y="878" font-size="14" font-weight="700" fill="#111827" text-anchor="start">B · DescribeImageAsync</text>
+<text x="924" y="900" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">스크린샷(긴 변 ≤1568px) + 메모</text>
+<text x="924" y="919" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">보이는 내용으로 설명 작성</text>
+<text x="924" y="938" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">민감 값은 '(민감 정보)'로 표기 지시</text>
+<text x="924" y="957" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">처음 쓸 때 'image' 동의 필요</text>
+<polyline points="197,816 197,854" fill="none" stroke="#D97706" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-D97706)"/>
+<polyline points="477,816 477,854" fill="none" stroke="#D97706" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-D97706)"/>
+<polyline points="757,816 757,854" fill="none" stroke="#D97706" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-D97706)"/>
+<polyline points="1037,816 1037,854" fill="none" stroke="#D97706" stroke-width="1.8" stroke-linejoin="round" marker-end="url(#head-D97706)"/>
+<rect x="630" y="1020" width="535" height="44" rx="8" fill="#FFFFFF" stroke="#D97706" stroke-width="1.4"/>
+<text x="644" y="1039" font-size="12.5" font-weight="700" fill="#111827" text-anchor="start">AiConsentStore → %APPDATA%\SnapContext\settings.json</text>
+<text x="644" y="1056" font-size="11.5" font-weight="400" fill="#6B7280" text-anchor="start">동의 전에는 아무것도 전송하지 않음 (종류별 text / image, 삭제하면 취소)</text>
+<polyline points="757,1004 757,1020" fill="none" stroke="#D97706" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#head-D97706)"/>
+<polyline points="1037,1004 1037,1020" fill="none" stroke="#D97706" stroke-width="1.6" stroke-linejoin="round" marker-end="url(#head-D97706)"/>
+<line x1="1210" y1="738" x2="1210" y2="1070" stroke="#DC2626" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="1200" y="752" font-size="12" font-weight="700" fill="#DC2626" text-anchor="end">이 PC 안</text>
+<text x="1220" y="752" font-size="12" font-weight="700" fill="#DC2626" text-anchor="start">외부 (인터넷)</text>
+<rect x="1250" y="854" width="380" height="150" rx="10" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.8"/>
+<text x="1264" y="878" font-size="14" font-weight="700" fill="#111827" text-anchor="start">Anthropic Messages API</text>
+<text x="1264" y="900" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">api.anthropic.com (HTTPS)</text>
+<text x="1264" y="919" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">키: 환경 변수 ANTHROPIC_API_KEY 에서만 읽음</text>
+<text x="1264" y="938" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">요청 제한 30초, 재시도 없음, 거절은 '제안 실패'</text>
+<text x="1264" y="957" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">응답: 제안 문장 (최대 400자)</text>
+<polyline points="810,854 810,836 1290,836 1290,854" fill="none" stroke="#DC2626" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-DC2626)"/>
+<circle cx="960" cy="836" r="12" fill="#DC2626" stroke="#FFFFFF" stroke-width="2"/>
+<text x="960" y="840.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">7</text>
+<text x="1062" y="831" font-size="12" font-weight="400" fill="#DC2626" text-anchor="start">메모 글만</text>
+<polyline points="1165,930 1250,930" fill="none" stroke="#DC2626" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-DC2626)"/>
+<rect x="1169.5" y="904" width="75" height="18" rx="4" fill="#FFF6E5"/>
+<text x="1207" y="917.5" font-size="11.5" font-weight="600" fill="#DC2626" text-anchor="middle">이미지+메모</text>
+<polyline points="1440,1004 1440,1112 55,1112 55,548 70,548" fill="none" stroke="#6B7280" stroke-width="2" stroke-linejoin="round" marker-end="url(#head-6B7280)" stroke-dasharray="7 5"/>
+<circle cx="700" cy="1112" r="12" fill="#6B7280" stroke="#FFFFFF" stroke-width="2"/>
+<text x="700" y="1116.5" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">8</text>
+<text x="724" y="1104" font-size="12" font-weight="400" fill="#6B7280" text-anchor="start">AI 제안 반환 → 토스트 제안 패널 (사용자가 [이 문장으로 교체]를 눌러야 클립보드가 바뀜)</text>
+<rect x="40" y="1140" width="1010" height="140" rx="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.3"/>
+<text x="60" y="1166" font-size="14" font-weight="700" fill="#111827" text-anchor="start">흐름 요약</text>
+<text x="60" y="1192" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">1</text>
+<text x="76" y="1192" font-size="12" font-weight="400" fill="#374151" text-anchor="start">Ctrl+Alt+S 전역 핫키 수신</text>
+<text x="60" y="1212" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">2</text>
+<text x="76" y="1212" font-size="12" font-weight="400" fill="#374151" text-anchor="start">전체 화면 오버레이에서 영역을 드래그</text>
+<text x="60" y="1232" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">3</text>
+<text x="76" y="1232" font-size="12" font-weight="400" fill="#374151" text-anchor="start">GDI로 선택 영역 캡처 (원본은 토스트가 닫힐 때까지 보관)</text>
+<text x="60" y="1252" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">4</text>
+<text x="76" y="1252" font-size="12" font-weight="400" fill="#374151" text-anchor="start">원본 이미지를 클립보드에 즉시 복사 → 이 시점부터 Ctrl+V 가능</text>
+<text x="60" y="1272" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">5</text>
+<text x="76" y="1272" font-size="12" font-weight="400" fill="#374151" text-anchor="start">포커스를 뺏지 않는 토스트 표시 (모드·AI 요청 함수 주입)</text>
+<text x="560" y="1192" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">6</text>
+<text x="576" y="1192" font-size="12" font-weight="400" fill="#374151" text-anchor="start">설명을 고르거나 입력하면 글을 먼저 그대로 캡션 합성해 클립보드 교체</text>
+<text x="560" y="1212" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">7</text>
+<text x="576" y="1212" font-size="12" font-weight="400" fill="#374151" text-anchor="start">(A/B) 같은 시점에 AI 제안을 비동기로 요청 — 기다리는 동안에도 붙여넣기 가능</text>
+<text x="560" y="1232" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">8</text>
+<text x="576" y="1232" font-size="12" font-weight="400" fill="#374151" text-anchor="start">제안이 도착하면 토스트에 표시, [이 문장으로 교체]를 눌러야 6번 경로로 반영</text>
+<text x="560" y="1252" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">9</text>
+<text x="576" y="1252" font-size="12" font-weight="400" fill="#374151" text-anchor="start">원하는 앱(ChatGPT·Claude·Gemini)에 Ctrl+V</text>
+<rect x="1080" y="1140" width="580" height="140" rx="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.3"/>
+<text x="1100" y="1166" font-size="14" font-weight="700" fill="#111827" text-anchor="start">지키는 규칙 (CLAUDE.md 10절)</text>
+<text x="1100" y="1192" font-size="12" font-weight="400" fill="#374151" text-anchor="start">A-1 입력 없이 즉시 클립보드 반영</text>
+<text x="1385" y="1192" font-size="12" font-weight="400" fill="#374151" text-anchor="start">A-2 토스트는 포커스를 뺏지 않음</text>
+<text x="1100" y="1212" font-size="12" font-weight="400" fill="#374151" text-anchor="start">A-3 아무것도 안 해도 자동 소멸</text>
+<text x="1385" y="1212" font-size="12" font-weight="400" fill="#374151" text-anchor="start">B-10 Win+V·클라우드 동기화 제외</text>
+<text x="1100" y="1232" font-size="12" font-weight="400" fill="#374151" text-anchor="start">C-14 화면 캡처는 GDI 기본</text>
+<text x="1385" y="1232" font-size="12" font-weight="400" fill="#374151" text-anchor="start">외부 전송은 --mode A/B + 동의 후에만</text>
+<text x="1100" y="1260" font-size="11.5" font-weight="400" fill="#6B7280" text-anchor="start">색: 파랑=항상 동작 · 초록=선택 단계 · 주황=설명 보강(실험) · 빨강=외부 전송</text>
+</svg>
