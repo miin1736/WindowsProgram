@@ -29,21 +29,14 @@ namespace SnapContext;
 /// </summary>
 public partial class CaptureToastWindow : Window
 {
-    [DllImport("user32.dll")]
-    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-
-    [DllImport("user32.dll")]
-    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-
-    private const int GwlExStyle = -20;
-    private const int WsExNoActivate = 0x08000000;
-    private const int WsExToolWindow = 0x00000080;
-
     private const uint VkOne = 0x31;
     private const int DisplayMs = 4000;
     private const int GraceMs = 1500;
     private const int TickMs = 100;
-    private const int AppliedMs = 1200;
+    private const int AppliedMs = 2000;
+
+    // 설명을 적용한 뒤 "이미지를 붙여넣고 설명은 글자로 이어 붙이는" 방법을 한 줄로 알려 준다.
+    private static readonly string CopyDescriptionHint = "\n" + AppHotkeys.CopyDescriptionText + ": 설명을 글자로 복사";
     private const int FailedMs = 3000;
     private const int SuggestionDecisionMs = 10000;
     private const int DraftHoldMs = 8000;
@@ -431,7 +424,7 @@ public partial class CaptureToastWindow : Window
     {
         ShowFinal(
             applied
-                ? "✓ 설명이 이미지에 반영되었습니다"
+                ? "✓ 설명이 이미지에 반영되었습니다" + CopyDescriptionHint
                 : "⚠ 설명을 반영하지 못했습니다 (원본 이미지는 클립보드에 그대로 있습니다)",
             applied ? AppliedMs : FailedMs);
     }
@@ -489,10 +482,7 @@ public partial class CaptureToastWindow : Window
 
     private void SetNoActivate(bool enabled)
     {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        int style = GetWindowLong(hwnd, GwlExStyle);
-        style = enabled ? style | WsExNoActivate | WsExToolWindow : style & ~WsExNoActivate;
-        SetWindowLong(hwnd, GwlExStyle, style);
+        NoActivateStyle.Apply(new WindowInteropHelper(this).Handle, enabled);
         _noActivate = enabled;
     }
 
@@ -553,7 +543,7 @@ public partial class CaptureToastWindow : Window
         bool ok = TryApply(text);
         ShowFinal(
             ok
-                ? "✓ AI 제안이 이미지에 반영되었습니다"
+                ? "✓ AI 제안이 이미지에 반영되었습니다" + CopyDescriptionHint
                 : "⚠ AI 제안을 반영하지 못했습니다 (클립보드의 이미지는 그대로 있습니다)",
             ok ? AppliedMs : FailedMs);
     }

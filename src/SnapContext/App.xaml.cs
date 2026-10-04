@@ -18,10 +18,10 @@ namespace SnapContext;
 /// </summary>
 public partial class App : Application
 {
-    private const uint VkS = 0x53;
     private static readonly string[] DefaultTags = { "버그", "UI 검토", "에러 로그" };
 
     private readonly RecentDescriptionStore _recents = new();
+    private readonly LastDescription _lastDescription = new();
     private readonly AiConsentStore _consent = new();
     private readonly LocalOcr _ocr = new();
 
@@ -61,7 +61,7 @@ public partial class App : Application
         // WM_HOTKEY 처리 안에서 모달 오버레이를 열지 않도록 디스패처로 넘긴다.
         int id = _hotkeyManager.TryRegister(
             ModifierKeys.Control | ModifierKeys.Alt,
-            VkS,
+            AppHotkeys.VkCapture,
             () => Dispatcher.BeginInvoke(new Action(OnCaptureHotkeyPressed)));
 
         if (id == 0)
@@ -74,6 +74,47 @@ public partial class App : Application
                 "SnapContext - 핫키 등록 실패",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
+        }
+
+        // 상시 켜 두는 두 번째 핫키: 알림창이 사라진 뒤에도 설명을 글자로 복사할 수 있어야 한다.
+        int copyId = _hotkeyManager.TryRegister(
+            ModifierKeys.Control | ModifierKeys.Alt,
+            AppHotkeys.VkCopyDescription,
+            () => Dispatcher.BeginInvoke(new Action(OnCopyDescriptionHotkeyPressed)));
+
+        if (copyId == 0)
+        {
+            // 규칙 C-12: 등록 실패는 보이게 알린다(재설정 UI는 Week 4).
+            NoticeToast.Show(
+                $"설명 복사 단축키({AppHotkeys.CopyDescriptionText}) 등록에 실패했습니다. 다른 프로그램과 충돌 중일 수 있습니다.",
+                warning: true,
+                durationMs: 6000);
+        }
+    }
+
+    /// <summary>
+    /// 순차 붙여넣기: 이미지를 붙여넣은 뒤 이 단축키로 설명을 글자로 복사해 이어서 붙여넣는다.
+    /// 결과는 포커스를 뺏지 않는 안내로 알려서, 사용자가 대화창에서 곧바로 Ctrl+V를 누를 수 있게 한다.
+    /// </summary>
+    private void OnCopyDescriptionHotkeyPressed()
+    {
+        if (_captureInProgress)
+        {
+            return;
+        }
+
+        switch (_lastDescription.TryCopy(text => ClipboardHelper.TrySetText(text)))
+        {
+            case DescriptionCopyResult.Copied:
+                var preview = _lastDescription.Text!.Length <= 60 ? _lastDescription.Text : _lastDescription.Text[..60] + "…";
+                NoticeToast.Show($"✓ 설명을 복사했습니다 — 붙여넣을 곳에서 Ctrl+V\n{preview}");
+                break;
+            case DescriptionCopyResult.NoDescription:
+                NoticeToast.Show("복사할 설명이 없습니다. 캡처한 뒤 알림창에서 설명을 적용하세요.", warning: true);
+                break;
+            default:
+                NoticeToast.Show("⚠ 설명을 복사하지 못했습니다. 잠시 후 다시 시도해 주세요.", warning: true);
+                break;
         }
     }
 
@@ -98,6 +139,9 @@ public partial class App : Application
             }
 
             var bitmap = ScreenCapture.CaptureRegion(region);
+
+            // 이전 캡처의 설명이 새 이미지에 잘못 복사되지 않도록 지운다.
+            _lastDescription.Clear();
 
             // 규칙 A-1: 다른 입력을 기다리지 않고 즉시 클립보드 반영
             bool copied = ClipboardHelper.TrySetImage(ScreenCapture.ToBitmapSource(bitmap));
@@ -203,6 +247,7 @@ public partial class App : Application
             }
 
             _recents.Add(description);
+            _lastDescription.Set(description);
             return true;
         }
         catch (Exception ex)

@@ -9,21 +9,23 @@
 </defs>
 <rect width="1700" height="1300" fill="#F8F9FB"/>
 <text x="50" y="58" font-size="28" font-weight="700" fill="#111827" text-anchor="start">SnapContext 구성도 — 한 번의 캡처가 지나가는 길</text>
-<text x="50" y="88" font-size="14.5" font-weight="400" fill="#6B7280" text-anchor="start">개발자 참고용 · C# / .NET 8 / WPF (src/SnapContext) · 2026-10-04 기준 (설명 보강 3개 버전 + 화면 글자 인식)</text>
+<text x="50" y="88" font-size="14.5" font-weight="400" fill="#6B7280" text-anchor="start">개발자 참고용 · C# / .NET 8 / WPF (src/SnapContext) · 2026-10-04 기준 (설명 보강 3개 버전 + 화면 글자 인식 + 설명 복사)</text>
 <rect x="40" y="118" width="1620" height="232" rx="14" fill="#EAF2FF" stroke="#A9C8FF" stroke-width="1.5"/>
 <text x="70" y="144" font-size="14.5" font-weight="700" fill="#2563EB" text-anchor="start">① 캡처 파이프라인 — 항상 동작하며 사용자 입력이 필요 없음 (규칙 A-1)</text>
 <rect x="70" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
 <text x="84" y="194" font-size="14" font-weight="700" fill="#111827" text-anchor="start">HotkeyManager.cs</text>
 <text x="84" y="216" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">RegisterHotKey / WM_HOTKEY</text>
 <text x="84" y="235" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">숨김 메시지 창에서 수신</text>
-<text x="84" y="254" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">여러 핫키를 동시에 등록·해제</text>
-<text x="84" y="273" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">충돌로 실패하면 0 반환 (C-12)</text>
+<text x="84" y="254" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">상시 핫키: Ctrl+Alt+S 캡처</text>
+<text x="84" y="273" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">상시 핫키: Ctrl+Alt+C 설명 복사</text>
+<text x="84" y="292" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">충돌로 실패하면 0 반환 (C-12)</text>
 <rect x="390" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
 <text x="404" y="194" font-size="14" font-weight="700" fill="#111827" text-anchor="start">App.xaml.cs  (지휘자)</text>
 <text x="404" y="216" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">전체 흐름 연결, 재진입 방지</text>
 <text x="404" y="235" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">--mode 읽기, AI 클라이언트 준비</text>
 <text x="404" y="254" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">원본 비트맵을 토스트가 닫힐 때까지 보관</text>
 <text x="404" y="273" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">설명 반영(ApplyDescription) 담당</text>
+<text x="404" y="292" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">마지막 설명 보관 · 안내창(NoticeToast)</text>
 <rect x="710" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
 <text x="724" y="194" font-size="14" font-weight="700" fill="#111827" text-anchor="start">RegionSelectionWindow</text>
 <text x="724" y="216" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">가상 화면 전체를 덮는 오버레이</text>
@@ -201,6 +203,8 @@
 <text x="576" y="1232" font-size="12" font-weight="400" fill="#374151" text-anchor="start">제안이 도착하면 토스트에 표시, [이 문장으로 교체]를 눌러야 6번 경로로 반영</text>
 <text x="560" y="1252" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">9</text>
 <text x="576" y="1252" font-size="12" font-weight="400" fill="#374151" text-anchor="start">원하는 앱(ChatGPT·Claude·Gemini)에 Ctrl+V</text>
+<text x="560" y="1272" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">10</text>
+<text x="576" y="1272" font-size="12" font-weight="400" fill="#374151" text-anchor="start">(선택) 이미지 뒤에 Ctrl+Alt+C로 설명을 글자로 이어 붙이기</text>
 <rect x="1080" y="1140" width="580" height="140" rx="12" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.3"/>
 <text x="1100" y="1166" font-size="14" font-weight="700" fill="#111827" text-anchor="start">지키는 규칙 (CLAUDE.md 10절)</text>
 <text x="1100" y="1192" font-size="12" font-weight="400" fill="#374151" text-anchor="start">A-1 입력 없이 즉시 클립보드 반영</text>
