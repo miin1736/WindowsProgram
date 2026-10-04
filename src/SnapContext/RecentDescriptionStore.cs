@@ -47,8 +47,19 @@ public sealed class RecentDescriptionStore
         }
     }
 
+    /// <summary>
+    /// 최근 설명 칩은 짧은 문구를 다시 쓰는 용도이고, 긴 글(화면 글자 초안, AI 제안, 질문 틀)에는
+    /// 민감한 내용이 들어 있을 수 있어 평문 파일에 남기지 않는다.
+    /// </summary>
+    public const int MaxRecentLength = 80;
+
     public void Add(string description)
     {
+        if (description.Length > MaxRecentLength)
+        {
+            return;
+        }
+
         var items = Load().Where(s => s != description).Prepend(description).Take(MaxItems).ToList();
         try
         {

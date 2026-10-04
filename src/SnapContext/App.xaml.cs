@@ -23,6 +23,7 @@ public partial class App : Application
 
     private readonly RecentDescriptionStore _recents = new();
     private readonly AiConsentStore _consent = new();
+    private readonly LocalOcr _ocr = new();
 
     private EnhanceMode _mode = EnhanceMode.Plain;
     private AiClient? _ai;
@@ -118,7 +119,10 @@ public partial class App : Application
             copied,
             description => ApplyDescription(original, description),
             _mode,
-            BuildSuggestionRequest(original));
+            BuildSuggestionRequest(original),
+            // 글자 인식은 컴퓨터 안에서만 처리된다. LocalOcr가 비트맵을 먼저 복사하므로 토스트가 닫혀 원본이 해제되어도 안전하다.
+            ct => _ocr.RecognizeAsync(original, ct),
+            text => ClipboardHelper.TrySetText(text));
 
         // 원본 비트맵은 토스트가 사라질 때까지(설명 반영·AI 제안 가능 시간 동안) 보관한다.
         toast.Closed += (_, _) =>

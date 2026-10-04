@@ -9,7 +9,7 @@
 </defs>
 <rect width="1700" height="1300" fill="#F8F9FB"/>
 <text x="50" y="58" font-size="28" font-weight="700" fill="#111827" text-anchor="start">SnapContext 구성도 — 한 번의 캡처가 지나가는 길</text>
-<text x="50" y="88" font-size="14.5" font-weight="400" fill="#6B7280" text-anchor="start">개발자 참고용 · C# / .NET 8 / WPF (src/SnapContext) · 2026-10-03 기준 (Week 2.5: 설명 보강 3개 버전)</text>
+<text x="50" y="88" font-size="14.5" font-weight="400" fill="#6B7280" text-anchor="start">개발자 참고용 · C# / .NET 8 / WPF (src/SnapContext) · 2026-10-04 기준 (설명 보강 3개 버전 + 화면 글자 인식)</text>
 <rect x="40" y="118" width="1620" height="232" rx="14" fill="#EAF2FF" stroke="#A9C8FF" stroke-width="1.5"/>
 <text x="70" y="144" font-size="14.5" font-weight="700" fill="#2563EB" text-anchor="start">① 캡처 파이프라인 — 항상 동작하며 사용자 입력이 필요 없음 (규칙 A-1)</text>
 <rect x="70" y="170" width="280" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="1.6"/>
@@ -80,6 +80,14 @@
 <text x="714" y="610" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">최근 설명 5개 (JSON)</text>
 <text x="714" y="629" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">%APPDATA%\SnapContext\</text>
 <text x="714" y="648" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">recent_descriptions.json</text>
+<rect x="1020" y="564" width="280" height="108" rx="10" fill="#FFFFFF" stroke="#16A34A" stroke-width="1.6"/>
+<text x="1034" y="588" font-size="14" font-weight="700" fill="#111827" text-anchor="start">LocalOcr.cs</text>
+<text x="1034" y="610" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">캡처 직후 백그라운드 글자 인식</text>
+<text x="1034" y="629" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">Windows 내장 OCR, 이 PC 안에서만</text>
+<text x="1034" y="648" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">작은 글자 2배 확대 · 줄 순서 정렬</text>
+<polyline points="1160,672 1160,690 500,690 500,672" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#head-16A34A)"/>
+<rect x="732.0" y="680" width="196" height="18" rx="4" fill="#EAF7EE"/>
+<text x="830" y="693.5" font-size="11.5" font-weight="600" fill="#16A34A" text-anchor="middle">글자 칩: 복사 · 설명 초안</text>
 <rect x="1350" y="424" width="280" height="108" rx="10" fill="#FFFFFF" stroke="#475569" stroke-width="1.6"/>
 <text x="1364" y="448" font-size="14" font-weight="700" fill="#111827" text-anchor="start">Windows 클립보드</text>
 <text x="1364" y="470" font-size="12.5" font-weight="400" fill="#374151" text-anchor="start">이미지 (CF_BITMAP / DIB / DIBV5)</text>
@@ -184,7 +192,7 @@
 <text x="60" y="1252" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">4</text>
 <text x="76" y="1252" font-size="12" font-weight="400" fill="#374151" text-anchor="start">원본 이미지를 클립보드에 즉시 복사 → 이 시점부터 Ctrl+V 가능</text>
 <text x="60" y="1272" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">5</text>
-<text x="76" y="1272" font-size="12" font-weight="400" fill="#374151" text-anchor="start">포커스를 뺏지 않는 토스트 표시 (모드·AI 요청 함수 주입)</text>
+<text x="76" y="1272" font-size="12" font-weight="400" fill="#374151" text-anchor="start">토스트 표시 (모드 주입 + 백그라운드 글자 인식 시작)</text>
 <text x="560" y="1192" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">6</text>
 <text x="576" y="1192" font-size="12" font-weight="400" fill="#374151" text-anchor="start">설명을 고르거나 입력하면 글을 먼저 그대로 캡션 합성해 클립보드 교체</text>
 <text x="560" y="1212" font-size="12.5" font-weight="700" fill="#2563EB" text-anchor="start">7</text>
@@ -198,7 +206,7 @@
 <text x="1100" y="1192" font-size="12" font-weight="400" fill="#374151" text-anchor="start">A-1 입력 없이 즉시 클립보드 반영</text>
 <text x="1385" y="1192" font-size="12" font-weight="400" fill="#374151" text-anchor="start">A-2 토스트는 포커스를 뺏지 않음</text>
 <text x="1100" y="1212" font-size="12" font-weight="400" fill="#374151" text-anchor="start">A-3 아무것도 안 해도 자동 소멸</text>
-<text x="1385" y="1212" font-size="12" font-weight="400" fill="#374151" text-anchor="start">B-10 Win+V·클라우드 동기화 제외</text>
+<text x="1385" y="1212" font-size="12" font-weight="400" fill="#374151" text-anchor="start">B-10 Win+V·클라우드 제외 (이미지·글자)</text>
 <text x="1100" y="1232" font-size="12" font-weight="400" fill="#374151" text-anchor="start">C-14 화면 캡처는 GDI 기본</text>
 <text x="1385" y="1232" font-size="12" font-weight="400" fill="#374151" text-anchor="start">외부 전송은 --mode A/B + 동의 후에만</text>
 <text x="1100" y="1260" font-size="11.5" font-weight="400" fill="#6B7280" text-anchor="start">색: 파랑=항상 동작 · 초록=선택 단계 · 주황=설명 보강(실험) · 빨강=외부 전송</text>

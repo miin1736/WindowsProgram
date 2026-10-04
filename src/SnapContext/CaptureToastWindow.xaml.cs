@@ -46,9 +46,16 @@ public partial class CaptureToastWindow : Window
     private const int AppliedMs = 1200;
     private const int FailedMs = 3000;
     private const int SuggestionDecisionMs = 10000;
+    private const int DraftHoldMs = 8000;
+    private const int MinOcrChars = 2;
     private const double ScreenMargin = 8;
 
+    // 글자 인식을 쓸 수 없다는 안내는 앱을 켠 뒤 한 번만 보여 준다(캡처할 때마다 반복하지 않는다).
+    private static bool s_ocrUnavailableHintShown;
+
     private readonly Func<string, bool> _applyDescription;
+    private readonly Func<CancellationToken, Task<OcrOutcome>>? _requestOcr;
+    private readonly Func<string, bool>? _copyText;
     private readonly Func<string?, CancellationToken, Task<AiResult>>? _requestSuggestion;
     private readonly EnhanceMode _mode;
     private readonly List<int> _hotkeyIds = new();
@@ -64,6 +71,8 @@ public partial class CaptureToastWindow : Window
     private bool _closed;
     private bool _appliedVerbatim;
     private string? _suggestion;
+    private string? _ocrText;
+    private string? _ocrDraft;
 
     /// <param name="applyDescription">설명을 이미지에 반영하고 클립보드를 갱신한다. 성공 여부를 반환한다.</param>
     /// <param name="requestSuggestion">A/B 버전에서 AI 제안을 받아 오는 함수(메모 → 제안). 다른 버전에서는 null.</param>
@@ -74,7 +83,9 @@ public partial class CaptureToastWindow : Window
         bool copied,
         Func<string, bool> applyDescription,
         EnhanceMode mode = EnhanceMode.Plain,
-        Func<string?, CancellationToken, Task<AiResult>>? requestSuggestion = null)
+        Func<string?, CancellationToken, Task<AiResult>>? requestSuggestion = null,
+        Func<CancellationToken, Task<OcrOutcome>>? requestOcr = null,
+        Func<string, bool>? copyText = null)
     {
         InitializeComponent();
 
@@ -82,6 +93,8 @@ public partial class CaptureToastWindow : Window
         _applyDescription = applyDescription;
         _mode = mode;
         _requestSuggestion = EnhanceModes.UsesAi(mode) ? requestSuggestion : null;
+        _requestOcr = requestOcr;
+        _copyText = copyText;
 
         if (mode != EnhanceMode.Plain)
         {
@@ -98,6 +111,16 @@ public partial class CaptureToastWindow : Window
         {
             HeaderText.Text = "✓ 캡처 완료 — 클립보드에 복사됨";
             BuildChips(recents, tags);
+
+            // 클립보드 반영과 토스트 표시가 끝난 뒤에 백그라운드에서 인식한다(규칙 A-1).
+            if (_requestOcr is not null)
+            {
+                _ = RunOcrAsync();
+            }
+            else
+            {
+                OcrRow.Visibility = Visibility.Collapsed;
+            }
         }
 
         _timer.Tick += OnTick;
@@ -153,6 +176,103 @@ public partial class CaptureToastWindow : Window
         }
 
         HintText.Text = BuildHint(count);
+    }
+
+    private async Task RunOcrAsync()
+    {
+        OcrOutcome outcome;
+        try
+        {
+            outcome = await _requestOcr!(_cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception)
+        {
+            outcome = new OcrOutcome(false, "", "글자 인식 중 오류가 발생했습니다.");
+        }
+
+        // 이미 설명을 적용했거나 닫힌 뒤에 도착한 결과는 버린다.
+        if (_closed || _finished)
+        {
+            return;
+        }
+
+        string text = outcome.Text.Trim();
+        if (!outcome.Ok || text.Length < MinOcrChars)
+        {
+            OcrRow.Visibility = Visibility.Collapsed;
+            if (!outcome.Ok && outcome.Error == LocalOcr.MissingLanguageMessage && !s_ocrUnavailableHintShown)
+            {
+                s_ocrUnavailableHintShown = true;
+                HintText.Text += "\n⚠ " + LocalOcr.MissingLanguageMessage;
+            }
+            return;
+        }
+
+        _ocrText = text;
+        _ocrDraft = OcrTextAssembler.ToDraft(text, InputBox.MaxLength);
+
+        OcrStatus.Visibility = Visibility.Collapsed;
+        OcrChips.Visibility = Visibility.Visible;
+
+        string preview = _ocrDraft.Length <= 120 ? _ocrDraft : _ocrDraft[..120] + "…";
+        if (_copyText is not null)
+        {
+            OcrChips.Children.Add(CreateChip(
+                new TextBlock { Text = $"📝 글자 복사 ({text.Length}자)" },
+                CopyOcrText,
+                preview + "\n\n클릭하면 이 글자가 클립보드로 복사되고, 이미지는 글자로 바뀝니다."));
+        }
+
+        OcrChips.Children.Add(CreateChip(
+            new TextBlock { Text = "📝 설명 초안으로" },
+            UseOcrDraft,
+            "인식한 글자를 설명 입력창에 채웁니다. 한글은 글자가 틀릴 수 있으니 확인하세요."));
+    }
+
+    /// <summary>인식한 글자 전체를 클립보드에 복사한다. 이미지가 글자로 바뀌므로 사용자가 직접 누를 때만 일어난다.</summary>
+    private void CopyOcrText()
+    {
+        if (_finished || _ocrText is null)
+        {
+            return;
+        }
+
+        _finished = true;
+        UnregisterHotkeys();
+
+        bool ok;
+        try
+        {
+            ok = _copyText!(_ocrText);
+        }
+        catch (Exception)
+        {
+            ok = false;
+        }
+
+        ShowFinal(
+            ok
+                ? "✓ 화면 글자를 복사했습니다 (클립보드의 이미지는 글자로 바뀌었습니다)"
+                : "⚠ 글자를 복사하지 못했습니다 (이미지는 클립보드에 그대로 있습니다)",
+            ok ? AppliedMs + 800 : FailedMs);
+    }
+
+    /// <summary>OCR 결과를 입력창에 초안으로 채운다. 적용은 사용자가 Enter로 직접 한다.</summary>
+    private void UseOcrDraft()
+    {
+        if (_finished || _ocrDraft is null)
+        {
+            return;
+        }
+
+        InputBox.Text = _ocrDraft;
+        InputBox.CaretIndex = InputBox.Text.Length;
+        HintText.Text = "⚠ OCR 초안입니다. 한글은 글자가 틀릴 수 있으니 확인한 뒤 Enter로 적용하세요 (입력창을 클릭하면 고칠 수 있습니다).";
+        _remainingMs = Math.Max(_remainingMs, DraftHoldMs);
     }
 
     private string BuildHint(int recentCount)
