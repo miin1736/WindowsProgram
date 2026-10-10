@@ -86,14 +86,6 @@
                        Margin="0,2,0,0" />
 
             <StackPanel x:Name="ContentPanel">
-                <Grid x:Name="OcrRow" Margin="0,8,0,0" MinHeight="30">
-                    <TextBlock x:Name="OcrStatus"
-                               Text="글자 인식 중…"
-                               Foreground="#80868B"
-                               FontSize="12"
-                               VerticalAlignment="Center" />
-                    <WrapPanel x:Name="OcrChips" Visibility="Collapsed" />
-                </Grid>
                 <WrapPanel x:Name="TagPanel" Margin="0,2,0,0" />
                 <WrapPanel x:Name="RecentPanel" />
                 <Grid Margin="0,2,0,0">

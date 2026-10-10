@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -11,32 +12,33 @@ namespace SnapContext;
 /// <summary>
 /// 전역 핫키(Ctrl+Alt+S) → 영역 선택 → GDI BitBlt 캡처 → 클립보드 즉시 반영 → 비모달 설명 토스트.
 /// 규칙 A-1: 클립보드 반영까지 어떤 필수 입력도 끼어들지 않는다(영역 드래그 선택은 캡처 동작 그 자체).
-/// 설명은 선택사항이며, 입력하면 캡션으로 번인한 이미지로 클립보드를 갱신한다.
+/// 설명은 캡처 전에 정해 둔 프리셋(PresetStore)으로 전달한다: 선택 화면에서 숫자키로 고르거나 기본 프리셋이 적용되며,
+/// 캡처하는 순간 그 설명을 캡션으로 번인한 이미지 한 장이 클립보드에 한 번에 올라간다.
+/// 알림창에서는 프리셋을 바꾸거나 직접 입력해 설명을 고칠 수 있다(선택 사항).
 ///
-/// 실행 인자 `--mode C|A|B`로 설명 보강 버전을 고른다(생략하면 입력한 글 그대로).
+/// 실행 인자 `--mode A|B`로 AI 설명 보강 실험 버전을 고른다(생략하면 AI 없음).
 /// A/B는 환경 변수 ANTHROPIC_API_KEY가 있어야 하고, 처음 쓸 때 외부 전송 동의를 받는다.
 /// </summary>
 public partial class App : Application
 {
-    private static readonly string[] DefaultTags = { "버그", "UI 검토", "에러 로그" };
-
     private readonly RecentDescriptionStore _recents = new();
-    private readonly LastDescription _lastDescription = new();
     private readonly AiConsentStore _consent = new();
-    private readonly LocalOcr _ocr = new();
+    private readonly PresetStore _presetStore = new();
 
     private EnhanceMode _mode = EnhanceMode.Plain;
     private AiClient? _ai;
     private HotkeyManager? _hotkeyManager;
     private Window? _messageWindow;
     private CaptureToastWindow? _toast;
+    private TrayIcon? _tray;
+    private PresetEditorWindow? _presetEditor;
     private bool _captureInProgress;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        // 트레이 상주(Week 4 예정) 전제로, 창이 하나도 안 보여도 앱이 종료되지 않게 함
+        // 트레이 상주 전제로, 창이 하나도 안 보여도 앱이 종료되지 않게 함(종료는 트레이 메뉴의 종료)
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         _mode = EnhanceModes.FromArgs(e.Args);
@@ -76,46 +78,28 @@ public partial class App : Application
                 MessageBoxImage.Warning);
         }
 
-        // 상시 켜 두는 두 번째 핫키: 알림창이 사라진 뒤에도 설명을 글자로 복사할 수 있어야 한다.
-        int copyId = _hotkeyManager.TryRegister(
-            ModifierKeys.Control | ModifierKeys.Alt,
-            AppHotkeys.VkCopyDescription,
-            () => Dispatcher.BeginInvoke(new Action(OnCopyDescriptionHotkeyPressed)));
-
-        if (copyId == 0)
-        {
-            // 규칙 C-12: 등록 실패는 보이게 알린다(재설정 UI는 Week 4).
-            NoticeToast.Show(
-                $"설명 복사 단축키({AppHotkeys.CopyDescriptionText}) 등록에 실패했습니다. 다른 프로그램과 충돌 중일 수 있습니다.",
-                warning: true,
-                durationMs: 6000);
-        }
+        // 트레이 아이콘: 앱이 켜져 있다는 표시이자 프리셋 편집 창과 종료의 진입점
+        _tray = new TrayIcon(
+            AppHotkeys.CaptureText,
+            () => Dispatcher.BeginInvoke(new Action(OnCaptureHotkeyPressed)),
+            () => Dispatcher.BeginInvoke(new Action(ShowPresetEditor)),
+            () => Dispatcher.BeginInvoke(new Action(Shutdown)));
     }
 
-    /// <summary>
-    /// 순차 붙여넣기: 이미지를 붙여넣은 뒤 이 단축키로 설명을 글자로 복사해 이어서 붙여넣는다.
-    /// 결과는 포커스를 뺏지 않는 안내로 알려서, 사용자가 대화창에서 곧바로 Ctrl+V를 누를 수 있게 한다.
-    /// </summary>
-    private void OnCopyDescriptionHotkeyPressed()
+    /// <summary>프리셋 편집 창은 하나만 연다. 이미 열려 있으면 앞으로 가져온다.</summary>
+    private void ShowPresetEditor()
     {
-        if (_captureInProgress)
+        if (_presetEditor is not null)
         {
+            _presetEditor.Activate();
             return;
         }
 
-        switch (_lastDescription.TryCopy(text => ClipboardHelper.TrySetText(text)))
-        {
-            case DescriptionCopyResult.Copied:
-                var preview = _lastDescription.Text!.Length <= 60 ? _lastDescription.Text : _lastDescription.Text[..60] + "…";
-                NoticeToast.Show($"✓ 설명을 복사했습니다 — 붙여넣을 곳에서 Ctrl+V\n{preview}");
-                break;
-            case DescriptionCopyResult.NoDescription:
-                NoticeToast.Show("복사할 설명이 없습니다. 캡처한 뒤 알림창에서 설명을 적용하세요.", warning: true);
-                break;
-            default:
-                NoticeToast.Show("⚠ 설명을 복사하지 못했습니다. 잠시 후 다시 시도해 주세요.", warning: true);
-                break;
-        }
+        var editor = new PresetEditorWindow(_presetStore);
+        editor.Closed += (_, _) => _presetEditor = null;
+        _presetEditor = editor;
+        editor.Show();
+        editor.Activate();
     }
 
     private void OnCaptureHotkeyPressed()
@@ -130,7 +114,10 @@ public partial class App : Application
         {
             CloseToast();
 
-            var overlay = new RegionSelectionWindow();
+            // 파일이 없거나 깨져도 예외 없이 기본 프리셋으로 복구되므로 캡처 흐름을 막지 않는다.
+            var presets = _presetStore.Load();
+
+            var overlay = new RegionSelectionWindow(presets);
             var result = overlay.ShowDialog();
 
             if (result != true || overlay.SelectedRegion is not { Width: > 0, Height: > 0 } region)
@@ -138,15 +125,13 @@ public partial class App : Application
                 return; // Esc 취소 또는 너무 작은 선택
             }
 
+            var preset = overlay.SelectedPreset;
             var bitmap = ScreenCapture.CaptureRegion(region);
 
-            // 이전 캡처의 설명이 새 이미지에 잘못 복사되지 않도록 지운다.
-            _lastDescription.Clear();
+            // 규칙 A-1: 다른 입력을 기다리지 않고, 프리셋 설명을 합성한 최종 이미지를 클립보드에 한 번에 반영
+            var (copied, applied) = CaptureComposer.Copy(bitmap, preset);
 
-            // 규칙 A-1: 다른 입력을 기다리지 않고 즉시 클립보드 반영
-            bool copied = ClipboardHelper.TrySetImage(ScreenCapture.ToBitmapSource(bitmap));
-
-            ShowToast(bitmap, copied);
+            ShowToast(bitmap, copied, presets, applied);
         }
         finally
         {
@@ -154,21 +139,19 @@ public partial class App : Application
         }
     }
 
-    private void ShowToast(Bitmap original, bool copied)
+    private void ShowToast(Bitmap original, bool copied, PresetSet presets, Preset? applied)
     {
         var toast = new CaptureToastWindow(
             _hotkeyManager!,
             copied ? _recents.Load() : Array.Empty<string>(),
-            DefaultTags,
+            presets.Presets,
+            applied,
             copied,
-            description => ApplyDescription(original, description),
+            description => ApplyDescription(original, description, presets),
             _mode,
-            BuildSuggestionRequest(original),
-            // 글자 인식은 컴퓨터 안에서만 처리된다. LocalOcr가 비트맵을 먼저 복사하므로 토스트가 닫혀 원본이 해제되어도 안전하다.
-            ct => _ocr.RecognizeAsync(original, ct),
-            text => ClipboardHelper.TrySetText(text));
+            BuildSuggestionRequest(original));
 
-        // 원본 비트맵은 토스트가 사라질 때까지(설명 반영·AI 제안 가능 시간 동안) 보관한다.
+        // 원본 비트맵은 토스트가 사라질 때까지(설명 변경, AI 제안 가능 시간 동안) 보관한다.
         toast.Closed += (_, _) =>
         {
             if (ReferenceEquals(_toast, toast))
@@ -236,7 +219,7 @@ public partial class App : Application
         return true;
     }
 
-    private bool ApplyDescription(Bitmap original, string description)
+    private bool ApplyDescription(Bitmap original, string description, PresetSet presets)
     {
         try
         {
@@ -246,8 +229,12 @@ public partial class App : Application
                 return false;
             }
 
-            _recents.Add(description);
-            _lastDescription.Set(description);
+            // 프리셋 칩으로 바꾼 설명은 칩으로 다시 고를 수 있으므로 "최근 설명"에 중복해 쌓지 않는다.
+            if (!presets.Presets.Any(p => description.StartsWith(p.Caption, StringComparison.Ordinal)))
+            {
+                _recents.Add(description);
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -267,6 +254,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         CloseToast();
+        _tray?.Dispose();
         _hotkeyManager?.Dispose();
         base.OnExit(e);
     }
