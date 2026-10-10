@@ -5,3 +5,9 @@
 bin/
 obj/
 *.user
+
+# 게임 이미지 저작권 고려: 시나리오 3 이미지는 로컬에서만 사용
+research/caption-compare-test/s3_*
+
+# MSIX 시험 산출물
+packaging/out/
