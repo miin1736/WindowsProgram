@@ -7,8 +7,6 @@ namespace SnapContext;
 public static class AppHotkeys
 {
     public const uint VkCapture = 0x53; // S
-    public const uint VkCopyDescription = 0x43; // C
 
     public const string CaptureText = "Ctrl+Alt+S";
-    public const string CopyDescriptionText = "Ctrl+Alt+C";
 }

@@ -22,8 +22,9 @@ namespace SnapContext;
 /// 최근 설명 재사용은 표시되는 동안에만 등록되는 Ctrl+Alt+1~5를 쓴다. Esc는 토스트가 활성화된 상태에서만 동작한다.
 /// 자동 소멸(규칙 A-3): 마우스를 올려두거나 입력 중이면 카운트다운을 멈춘다.
 ///
+/// 프리셋: 캡처할 때 이미 프리셋 설명이 합성되어 클립보드에 올라가 있다. 여기서 다른 프리셋 칩을 누르면 설명이 바뀐다.
+///
 /// 설명 보강 버전(EnhanceMode):
-/// - Template(C): 태그를 누르면 완성된 질문 문장이 설명이 된다.
 /// - TextRewrite(A) / ImageDescribe(B): 입력한 설명은 먼저 그대로 반영(즉시 사용 가능)하고,
 ///   AI 제안은 뒤따라 도착하면 "제안"으로만 보여준다. 사용자가 "이 문장으로 교체"를 눌러야 클립보드가 바뀐다.
 /// </summary>
@@ -35,20 +36,12 @@ public partial class CaptureToastWindow : Window
     private const int TickMs = 100;
     private const int AppliedMs = 2000;
 
-    // 설명을 적용한 뒤 "이미지를 붙여넣고 설명은 글자로 이어 붙이는" 방법을 한 줄로 알려 준다.
-    private static readonly string CopyDescriptionHint = "\n" + AppHotkeys.CopyDescriptionText + ": 설명을 글자로 복사";
     private const int FailedMs = 3000;
     private const int SuggestionDecisionMs = 10000;
     private const int DraftHoldMs = 8000;
-    private const int MinOcrChars = 2;
     private const double ScreenMargin = 8;
 
-    // 글자 인식을 쓸 수 없다는 안내는 앱을 켠 뒤 한 번만 보여 준다(캡처할 때마다 반복하지 않는다).
-    private static bool s_ocrUnavailableHintShown;
-
     private readonly Func<string, bool> _applyDescription;
-    private readonly Func<CancellationToken, Task<OcrOutcome>>? _requestOcr;
-    private readonly Func<string, bool>? _copyText;
     private readonly Func<string?, CancellationToken, Task<AiResult>>? _requestSuggestion;
     private readonly EnhanceMode _mode;
     private readonly List<int> _hotkeyIds = new();
@@ -63,22 +56,20 @@ public partial class CaptureToastWindow : Window
     private bool _holdCountdown;
     private bool _closed;
     private bool _appliedVerbatim;
+    private bool _hasPresets;
     private string? _suggestion;
-    private string? _ocrText;
-    private string? _ocrDraft;
 
     /// <param name="applyDescription">설명을 이미지에 반영하고 클립보드를 갱신한다. 성공 여부를 반환한다.</param>
     /// <param name="requestSuggestion">A/B 버전에서 AI 제안을 받아 오는 함수(메모 → 제안). 다른 버전에서는 null.</param>
     public CaptureToastWindow(
         HotkeyManager hotkeys,
         IReadOnlyList<string> recents,
-        IReadOnlyList<string> tags,
+        IReadOnlyList<Preset> presets,
+        Preset? appliedPreset,
         bool copied,
         Func<string, bool> applyDescription,
         EnhanceMode mode = EnhanceMode.Plain,
-        Func<string?, CancellationToken, Task<AiResult>>? requestSuggestion = null,
-        Func<CancellationToken, Task<OcrOutcome>>? requestOcr = null,
-        Func<string, bool>? copyText = null)
+        Func<string?, CancellationToken, Task<AiResult>>? requestSuggestion = null)
     {
         InitializeComponent();
 
@@ -86,8 +77,6 @@ public partial class CaptureToastWindow : Window
         _applyDescription = applyDescription;
         _mode = mode;
         _requestSuggestion = EnhanceModes.UsesAi(mode) ? requestSuggestion : null;
-        _requestOcr = requestOcr;
-        _copyText = copyText;
 
         if (mode != EnhanceMode.Plain)
         {
@@ -102,18 +91,11 @@ public partial class CaptureToastWindow : Window
         }
         else
         {
-            HeaderText.Text = "✓ 캡처 완료 — 클립보드에 복사됨";
-            BuildChips(recents, tags);
-
-            // 클립보드 반영과 토스트 표시가 끝난 뒤에 백그라운드에서 인식한다(규칙 A-1).
-            if (_requestOcr is not null)
-            {
-                _ = RunOcrAsync();
-            }
-            else
-            {
-                OcrRow.Visibility = Visibility.Collapsed;
-            }
+            HeaderText.Text = appliedPreset is null
+                ? "✓ 캡처 완료 — 클립보드에 복사됨"
+                : $"✓ 캡처 완료 — [{appliedPreset.Name}] 설명이 포함되어 복사됨";
+            _hasPresets = presets.Count > 0;
+            BuildChips(recents, presets, appliedPreset);
         }
 
         _timer.Tick += OnTick;
@@ -123,7 +105,7 @@ public partial class CaptureToastWindow : Window
 
     private bool IsInteracting => IsMouseOver || InputBox.IsKeyboardFocusWithin;
 
-    private void BuildChips(IReadOnlyList<string> recents, IReadOnlyList<string> tags)
+    private void BuildChips(IReadOnlyList<string> recents, IReadOnlyList<Preset> presets, Preset? applied)
     {
         if (_mode == EnhanceMode.ImageDescribe && _requestSuggestion is not null)
         {
@@ -133,10 +115,11 @@ public partial class CaptureToastWindow : Window
                 "스크린샷을 AI(Anthropic)로 보내 설명을 작성합니다"));
         }
 
-        foreach (var tag in tags)
+        foreach (var preset in presets)
         {
-            var captured = tag;
-            TagPanel.Children.Add(CreateChip(new TextBlock { Text = tag }, () => ApplyTag(captured), null));
+            var captured = preset;
+            string label = applied is not null && applied.Id == preset.Id ? "✓ " + preset.Name : preset.Name;
+            TagPanel.Children.Add(CreateChip(new TextBlock { Text = label }, () => ApplyPreset(captured), preset.Caption));
         }
 
         int count = Math.Min(recents.Count, RecentDescriptionStore.MaxItems);
@@ -171,103 +154,6 @@ public partial class CaptureToastWindow : Window
         HintText.Text = BuildHint(count);
     }
 
-    private async Task RunOcrAsync()
-    {
-        OcrOutcome outcome;
-        try
-        {
-            outcome = await _requestOcr!(_cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-        catch (Exception)
-        {
-            outcome = new OcrOutcome(false, "", "글자 인식 중 오류가 발생했습니다.");
-        }
-
-        // 이미 설명을 적용했거나 닫힌 뒤에 도착한 결과는 버린다.
-        if (_closed || _finished)
-        {
-            return;
-        }
-
-        string text = outcome.Text.Trim();
-        if (!outcome.Ok || text.Length < MinOcrChars)
-        {
-            OcrRow.Visibility = Visibility.Collapsed;
-            if (!outcome.Ok && outcome.Error == LocalOcr.MissingLanguageMessage && !s_ocrUnavailableHintShown)
-            {
-                s_ocrUnavailableHintShown = true;
-                HintText.Text += "\n⚠ " + LocalOcr.MissingLanguageMessage;
-            }
-            return;
-        }
-
-        _ocrText = text;
-        _ocrDraft = OcrTextAssembler.ToDraft(text, InputBox.MaxLength);
-
-        OcrStatus.Visibility = Visibility.Collapsed;
-        OcrChips.Visibility = Visibility.Visible;
-
-        string preview = _ocrDraft.Length <= 120 ? _ocrDraft : _ocrDraft[..120] + "…";
-        if (_copyText is not null)
-        {
-            OcrChips.Children.Add(CreateChip(
-                new TextBlock { Text = $"📝 글자 복사 ({text.Length}자)" },
-                CopyOcrText,
-                preview + "\n\n클릭하면 이 글자가 클립보드로 복사되고, 이미지는 글자로 바뀝니다."));
-        }
-
-        OcrChips.Children.Add(CreateChip(
-            new TextBlock { Text = "📝 설명 초안으로" },
-            UseOcrDraft,
-            "인식한 글자를 설명 입력창에 채웁니다. 한글은 글자가 틀릴 수 있으니 확인하세요."));
-    }
-
-    /// <summary>인식한 글자 전체를 클립보드에 복사한다. 이미지가 글자로 바뀌므로 사용자가 직접 누를 때만 일어난다.</summary>
-    private void CopyOcrText()
-    {
-        if (_finished || _ocrText is null)
-        {
-            return;
-        }
-
-        _finished = true;
-        UnregisterHotkeys();
-
-        bool ok;
-        try
-        {
-            ok = _copyText!(_ocrText);
-        }
-        catch (Exception)
-        {
-            ok = false;
-        }
-
-        ShowFinal(
-            ok
-                ? "✓ 화면 글자를 복사했습니다 (클립보드의 이미지는 글자로 바뀌었습니다)"
-                : "⚠ 글자를 복사하지 못했습니다 (이미지는 클립보드에 그대로 있습니다)",
-            ok ? AppliedMs + 800 : FailedMs);
-    }
-
-    /// <summary>OCR 결과를 입력창에 초안으로 채운다. 적용은 사용자가 Enter로 직접 한다.</summary>
-    private void UseOcrDraft()
-    {
-        if (_finished || _ocrDraft is null)
-        {
-            return;
-        }
-
-        InputBox.Text = _ocrDraft;
-        InputBox.CaretIndex = InputBox.Text.Length;
-        HintText.Text = "⚠ OCR 초안입니다. 한글은 글자가 틀릴 수 있으니 확인한 뒤 Enter로 적용하세요 (입력창을 클릭하면 고칠 수 있습니다).";
-        _remainingMs = Math.Max(_remainingMs, DraftHoldMs);
-    }
-
     private string BuildHint(int recentCount)
     {
         string basics = recentCount > 0
@@ -276,10 +162,9 @@ public partial class CaptureToastWindow : Window
 
         return _mode switch
         {
-            EnhanceMode.Template => "태그를 누르면 완성된 질문 문장이 이미지에 들어갑니다. " + basics,
             EnhanceMode.TextRewrite => basics + "\n설명을 적용하면 그 글(이미지 제외)이 AI(Anthropic)로 전송되어 다듬은 제안을 받습니다.",
             EnhanceMode.ImageDescribe => basics + "\n✨ 버튼이나 설명 적용 시 스크린샷이 AI(Anthropic)로 전송됩니다.",
-            _ => basics,
+            _ => (_hasPresets ? "프리셋을 누르면 이 이미지의 설명이 바뀝니다. " : "") + basics,
         };
     }
 
@@ -295,17 +180,11 @@ public partial class CaptureToastWindow : Window
         return button;
     }
 
-    private void ApplyTag(string tag)
+    /// <summary>프리셋 칩: 그 프리셋의 설명으로 바꾼다. 입력창에 적어 둔 글이 있으면 "참고:"로 덧붙인다.</summary>
+    private void ApplyPreset(Preset preset)
     {
         var memo = InputBox.Text.Trim();
-
-        if (_mode == EnhanceMode.Template)
-        {
-            Finish(PromptTemplates.Build(tag, memo) ?? tag);
-            return;
-        }
-
-        Finish(memo.Length == 0 ? tag : $"{tag}: {memo}");
+        Finish(memo.Length == 0 ? preset.Caption : $"{preset.Caption} 참고: {memo}");
     }
 
     /// <summary>
@@ -424,7 +303,7 @@ public partial class CaptureToastWindow : Window
     {
         ShowFinal(
             applied
-                ? "✓ 설명이 이미지에 반영되었습니다" + CopyDescriptionHint
+                ? "✓ 설명이 이미지에 반영되었습니다"
                 : "⚠ 설명을 반영하지 못했습니다 (원본 이미지는 클립보드에 그대로 있습니다)",
             applied ? AppliedMs : FailedMs);
     }
@@ -543,7 +422,7 @@ public partial class CaptureToastWindow : Window
         bool ok = TryApply(text);
         ShowFinal(
             ok
-                ? "✓ AI 제안이 이미지에 반영되었습니다" + CopyDescriptionHint
+                ? "✓ AI 제안이 이미지에 반영되었습니다"
                 : "⚠ AI 제안을 반영하지 못했습니다 (클립보드의 이미지는 그대로 있습니다)",
             ok ? AppliedMs : FailedMs);
     }
