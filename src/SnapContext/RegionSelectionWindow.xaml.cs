@@ -16,6 +16,11 @@ namespace SnapContext;
 /// 아무 키도 누르지 않으면 기본 프리셋이 적용되므로 입력은 전혀 필요 없다(규칙 A-1).
 /// 숫자키는 이 오버레이가 활성일 때만 받으므로 다른 앱의 입력을 가로채지 않는다.
 /// 안내 막대는 마우스 입력을 받지 않아 그 아래에서도 드래그할 수 있다.
+///
+/// 취소와 숫자키는 이 창이 키보드 포커스를 못 받아도 동작해야 한다: 윈도우의 전경 창 규칙 때문에 단축키를 눌러도
+/// 선택 화면이 맨 앞 창이 되지 못하는 경우가 있고(실측), 그러면 Esc가 다른 앱으로 간다. 그래서 선택 화면이 떠 있는
+/// 동안에만 Esc와 숫자키를 전역 단축키로 등록하고(닫히면 즉시 해제), 마우스 오른쪽 클릭으로도 취소할 수 있게 한다.
+/// 선택 화면은 화면 전체를 덮은 채 이 키들을 안내하고 있으므로 이 몇 초 동안 키를 가져가는 것은 의도된 동작이다.
 /// </summary>
 public partial class RegionSelectionWindow : Window
 {
@@ -34,8 +39,13 @@ public partial class RegionSelectionWindow : Window
     /// <summary>이번 캡처에 적용할 프리셋. "설명 없음"이면 null.</summary>
     public Preset? SelectedPreset => _presets.FirstOrDefault(p => p.Id == _selectedId);
 
-    public RegionSelectionWindow(PresetSet? presets = null)
+    private readonly HotkeyManager? _hotkeys;
+    private readonly List<int> _hotkeyIds = new();
+    private bool _finished;
+
+    public RegionSelectionWindow(PresetSet? presets = null, HotkeyManager? hotkeys = null)
     {
+        _hotkeys = hotkeys;
         InitializeComponent();
 
         _presets = presets?.Presets ?? Array.Empty<Preset>();
@@ -50,6 +60,14 @@ public partial class RegionSelectionWindow : Window
         MouseLeftButtonDown += OnMouseLeftButtonDown;
         MouseMove += OnMouseMove;
         MouseLeftButtonUp += OnMouseLeftButtonUp;
+        MouseRightButtonUp += (_, _) => Cancel();
+        ContentRendered += (_, _) =>
+        {
+            RegisterKeyHotkeys();
+            Activate();
+            Focus();
+        };
+        Closed += (_, _) => ReleaseKeyHotkeys();
     }
 
     /// <summary>화면 위쪽 가운데(주 모니터 기준)에 프리셋 목록과 조작 안내를 그린다.</summary>
@@ -204,17 +222,88 @@ public partial class RegionSelectionWindow : Window
             _presetBarHost.Visibility = Visibility.Hidden;
         }
 
+        _finished = true;
+        ReleaseKeyHotkeys();
         DialogResult = true;
         Close();
+    }
+
+    /// <summary>취소한다(Esc, 오른쪽 클릭). 이미 끝났으면 아무것도 하지 않는다.</summary>
+    public void Cancel()
+    {
+        if (_finished)
+        {
+            return;
+        }
+
+        _finished = true;
+        SelectedRegion = null;
+        ReleaseKeyHotkeys();
+
+        try
+        {
+            DialogResult = false;
+        }
+        catch (InvalidOperationException)
+        {
+            // 대화상자로 열리지 않은 경우(시험 등)에는 결과 없이 닫기만 한다.
+        }
+
+        Close();
+    }
+
+    /// <summary>
+    /// 선택 화면이 떠 있는 동안에만 Esc와 숫자키(윗줄과 키패드)를 전역 단축키로 등록한다.
+    /// 등록에 실패한 키는 건너뛴다(그 경우에도 창이 포커스를 받으면 KeyDown으로 동작한다).
+    /// 핸들러는 디스패처로 넘긴다(WM_HOTKEY 처리 안에서 창을 닫지 않기 위해).
+    /// </summary>
+    public void RegisterKeyHotkeys()
+    {
+        if (_hotkeys is null || _hotkeyIds.Count > 0)
+        {
+            return;
+        }
+
+        void Add(uint vk, Action action)
+        {
+            int id = _hotkeys.TryRegister(ModifierKeys.None, vk, () => Dispatcher.BeginInvoke(action));
+            if (id != 0)
+            {
+                _hotkeyIds.Add(id);
+            }
+        }
+
+        Add(0x1B, Cancel); // VK_ESCAPE
+        for (int d = 0; d <= 9; d++)
+        {
+            int digit = d;
+            Add((uint)(0x30 + d), () => SelectDigit(digit));  // 윗줄 0~9
+            Add((uint)(0x60 + d), () => SelectDigit(digit));  // 키패드 0~9
+        }
+    }
+
+    /// <summary>등록한 전역 단축키를 모두 해제한다. 선택 화면이 닫힐 때 반드시 호출된다.</summary>
+    public void ReleaseKeyHotkeys()
+    {
+        if (_hotkeys is null)
+        {
+            _hotkeyIds.Clear();
+            return;
+        }
+
+        foreach (var id in _hotkeyIds)
+        {
+            _hotkeys.Unregister(id);
+        }
+
+        _hotkeyIds.Clear();
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
         {
-            SelectedRegion = null;
-            DialogResult = false;
-            Close();
+            Cancel();
             return;
         }
 
