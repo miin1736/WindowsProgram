@@ -117,7 +117,7 @@ public partial class App : Application
             // 파일이 없거나 깨져도 예외 없이 기본 프리셋으로 복구되므로 캡처 흐름을 막지 않는다.
             var presets = _presetStore.Load();
 
-            var overlay = new RegionSelectionWindow(presets);
+            var overlay = new RegionSelectionWindow(presets, _hotkeyManager);
             var result = overlay.ShowDialog();
 
             if (result != true || overlay.SelectedRegion is not { Width: > 0, Height: > 0 } region)
